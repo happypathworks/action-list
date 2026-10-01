@@ -22,7 +22,7 @@ compatibility: >
   `node check_deps.js` from the skill folder to confirm before building. See
   SETUP.md.
 metadata:
-  version: 1.0.0
+  version: 1.0.1
 ---
 
 # action-list

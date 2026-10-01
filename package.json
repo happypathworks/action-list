@@ -1,6 +1,6 @@
 {
   "name": "action-list-skill",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Package metadata for the action-list skill. It declares no dependencies: docx 9.7.1 ships inside the skill at vendor/docx.cjs, so there is nothing to install.",
   "license": "SEE LICENSE IN LICENSE.txt",

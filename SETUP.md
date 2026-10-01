@@ -150,8 +150,9 @@ web app, Cowork sessions, cloud sessions and routines. Installing one place does
 not install the other, so put it wherever you actually work, or both. This is a
 fact about where files live, not a limit on where the skill runs.
 
-**Where it has been run.** Claude Code on Windows 11 with Node 24. The other
-surfaces have not yet been exercised with this skill.
+**Where it has been run.** Claude Code on Windows 11 with Node 24, and the
+claude.ai web app. Cowork and the desktop app have not yet been exercised with
+this skill.
 
 ## License
 
