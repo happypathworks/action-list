@@ -1,0 +1,40 @@
+{
+  "schema": "hpw-action-list/1",
+  "meeting": "Holiday blend planning",
+  "date": "2026-09-10",
+  "notes": "notes.txt",
+  "actions": [
+    {
+      "owner": "Ana",
+      "action": "Order 200 printed holiday labels",
+      "due": "September 19",
+      "source": "Ana will order 200 printed holiday labels by September 19"
+    },
+    {
+      "owner": "Jules",
+      "action": "Draft the product page copy",
+      "due": "September 24",
+      "source": "Jules to draft the product page copy by September 24"
+    },
+    {
+      "owner": "Ana",
+      "ownerAssigned": true,
+      "action": "Confirm the co-packer can run the holiday tins",
+      "due": "October",
+      "source": "We still need someone to check whether the co-packer can run the holiday tins in October"
+    },
+    {
+      "owner": "Morgan",
+      "action": "Ask the photographer for photo shoot dates",
+      "due": "",
+      "source": "Morgan will ask the photographer for dates"
+    },
+    {
+      "owner": "Jules",
+      "ownerAssigned": true,
+      "action": "Update the wholesale price sheet with the holiday blend",
+      "due": "",
+      "source": "Someone should also update the wholesale price sheet with the holiday blend"
+    }
+  ]
+}

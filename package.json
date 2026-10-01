@@ -1,0 +1,15 @@
+{
+  "name": "action-list-skill",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Package metadata for the action-list skill. It declares no dependencies: docx 9.7.1 ships inside the skill at vendor/docx.cjs, so there is nothing to install.",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "check": "node check_deps.js",
+    "example": "cd examples/roastery-weekly && node ../../build_action_list.js actions.json --kit .",
+    "example:refused": "cd examples/unowned-action && node ../../action_check.js actions.json --kit ."
+  }
+}

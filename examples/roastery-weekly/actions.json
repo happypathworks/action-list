@@ -1,0 +1,44 @@
+{
+  "schema": "hpw-action-list/1",
+  "meeting": "Roastery operations weekly",
+  "date": "2026-04-23",
+  "notes": "notes.txt",
+  "actions": [
+    {
+      "owner": "Dana",
+      "action": "Place the Huila reorder with the importer",
+      "due": "Friday April 25",
+      "source": "Dana will place the reorder with the importer by Friday April 25"
+    },
+    {
+      "owner": "Luis",
+      "action": "Confirm warehouse space for the June container",
+      "due": "May 1",
+      "source": "Luis to confirm warehouse space for the June container before May 1"
+    },
+    {
+      "owner": "Sam",
+      "action": "Book the service technician for the drum bearing",
+      "due": "week of May 5",
+      "source": "Sam will book the service technician for the week of May 5"
+    },
+    {
+      "owner": "Priya, Theo",
+      "action": "Put together the onboarding kit for the new cafe accounts",
+      "due": "April 30",
+      "source": "Priya and Theo will put together the onboarding kit (price list, brew guide, order form) by April 30"
+    },
+    {
+      "owner": "Theo",
+      "action": "Send the updated price list to current wholesale accounts",
+      "due": "",
+      "source": "Theo to send the updated price list to all current wholesale accounts"
+    },
+    {
+      "owner": "Luis",
+      "action": "Get two alternate quotes for the 5-lb bags",
+      "due": "before the next meeting",
+      "source": "Luis will get two alternate quotes before the next meeting"
+    }
+  ]
+}
