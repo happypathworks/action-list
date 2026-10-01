@@ -1,0 +1,2 @@
+{"source": "04_free/action-list",
+ "public_only": ["README.md", ".gitattributes", ".gitignore", ".github/**", ".claude-plugin/**"]}
