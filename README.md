@@ -59,6 +59,11 @@ list and the one-page .docx it builds.
 
 ## Install
 
+The packaged download, this skill and `brand-kit` as two `.skill` files in
+one zip, is free on Gumroad:
+[happypathworks.gumroad.com/l/action-list](https://happypathworks.gumroad.com/l/action-list).
+Or use this repository as it is:
+
 Put the whole folder where your Claude surface keeps skills, as
 `action-list/`:
 
