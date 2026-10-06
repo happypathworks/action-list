@@ -5,6 +5,8 @@ document: owner, action, due date, and the line in the notes each action came
 from. It builds in your organization's colors and logo when a brand kit is
 present, and in neutral defaults when one is not.
 
+Product page, with a sample list: https://happypath.works/free/action-list/ — from [Happy Path Works](https://happypath.works/).
+
 Free, MIT. Node 18 or later, and nothing to install: the one library it uses
 ships inside the skill.
 
