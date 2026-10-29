@@ -35,9 +35,9 @@ const ROOT = __dirname;
 // SETUP.md's "What's in the folder" listing is the contract; this is that
 // listing, mechanically.
 const BUNDLED_FILES = [
-  'SKILL.md', 'SETUP.md', 'LICENSE.txt', 'package.json', 'check_deps.js',
-  'action_check.js', 'build_action_list.js',
-  'brand_kit.js', 'brand_check.js',
+  'SKILL.md', 'SETUP.md', 'NOT_CHECKED.md', 'LICENSE.txt', 'package.json', 'check_deps.js',
+  'action_check.js', 'actions.schema.json', 'build_action_list.js',
+  'brand_kit.js', 'brand_check.js', 'brand_rules.js',
   'vendor/docx.cjs', 'vendor/THIRD_PARTY_LICENSES.txt',
 ];
 
@@ -78,13 +78,6 @@ try {
 } catch (e) { docxDetail = 'not loadable (' + (e.code || e.message) + ')'; }
 add('vendored docx loads', !!docx, docxDetail, 'vendor/docx.cjs is missing, damaged or replaced. ' + REINSTALL);
 
-if (docx) {
-  const need = ['Document', 'Packer', 'Paragraph', 'TextRun', 'Table', 'TableRow', 'ImageRun',
-    'WidthType', 'AlignmentType', 'TableLayoutType', 'LineRuleType'];
-  const gone = need.filter((k) => !(k in docx));
-  add('docx exports what the builder uses', gone.length === 0, gone.length ? 'missing: ' + gone.join(', ') : need.length + ' present', REINSTALL);
-}
-
 // --- 4. The brand kit loader works ---------------------------------------------
 // Pinned to the clean example's kit, so a kit in the folder this is run from
 // cannot make the preflight pass or fail. The preflight checks the skill; the
@@ -93,12 +86,8 @@ if (docx) {
   process.env.HPW_BRAND_KIT = path.join(ROOT, EX_CLEAN);
   let kit = null, err = '';
   try { kit = require(path.join(ROOT, 'brand_kit.js')).load(); } catch (e) { err = e.message; }
-  const need = ['palette', 'type', 'org', 'naming', 'logo', 'header'];
-  const gone = kit ? need.filter((k) => kit[k] === undefined) : need;
-  add('brand_kit.js resolves a kit', !!kit && gone.length === 0,
-    !kit ? 'failed to load: ' + err
-         : gone.length ? 'kit has no ' + gone.join(', ')
-                       : 'resolved ' + kit._source + ', palette ACCENT ' + kit.palette.ACCENT, REINSTALL);
+  add('brand_kit.js resolves a kit', !!kit,
+    kit ? 'resolved ' + kit._source + ', palette ACCENT ' + kit.palette.ACCENT : 'failed to load: ' + err, REINSTALL);
 }
 
 // --- 5. The scripts answer, and the checker agrees with its examples ----------

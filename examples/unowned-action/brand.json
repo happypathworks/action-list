@@ -20,10 +20,6 @@
     "absent": true,
     "path": null
   },
-  "header": {
-    "style": "title-only",
-    "rule": "accent"
-  },
   "naming": {
     "PREFIX": "ROAST",
     "SEGMENTS": [

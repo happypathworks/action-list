@@ -1,0 +1,28 @@
+{
+  "$comment": "The input action_check.js accepts, and the only one: it reads this file and refuses a key not listed here, or a value of another type, by name. The rules that need the notes (owners, quotes, the page) are in action_check.js.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "meeting", "notes", "actions"],
+  "properties": {
+    "schema": {"type": "string"},
+    "meeting": {"type": "string"},
+    "date": {"type": "string"},
+    "segment": {"type": "string"},
+    "notes": {"type": "string"},
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["owner", "action", "source"],
+        "properties": {
+          "owner": {"type": "string"},
+          "ownerAssigned": {"type": "boolean"},
+          "action": {"type": "string"},
+          "due": {"type": "string"},
+          "source": {"type": "string"}
+        }
+      }
+    }
+  }
+}

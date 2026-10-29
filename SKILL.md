@@ -22,14 +22,14 @@ compatibility: >
   `node check_deps.js` from the skill folder to confirm before building. See
   SETUP.md.
 metadata:
-  version: 1.0.1
+  version: 1.1.0
 ---
 
 # action-list
 
 Meeting notes in, one page out: a branded table of who owes what by when, each
 row carrying the words from the notes it was taken from. The table is the
-whole product. It stops there.
+whole product.
 
 ## The gap this closes
 
@@ -40,10 +40,12 @@ list that reads as settled. Three things in it are not.
    co-packer" comes back as an action for the meeting's chair, because a row
    with a blank owner looks unfinished and a named one looks done. Nothing on
    the page distinguishes an owner the room agreed from one the model picked.
+
 2. **Actions that cannot be traced back.** The model rewrites each commitment
    in its own words. When someone disputes a row a week later, there is no
    way to find what was actually said, and a paraphrase can quietly change
    the commitment.
+
 3. **A second page.** An action list is read on one page. Past a dozen rows
    with long wording, the table spills, and the overflow page carries the rows
    nobody reads.
@@ -60,6 +62,11 @@ and the builder writes nothing until it returns 0.
 
 Pasted notes are everything in the message after the `actions:` prefix.
 
+A built .docx carries no notes, so its check re-measures the page and requires
+each row to carry an owner that names somebody and a numbered quote, and the
+builder's formatting only (`layout.format`); it does not re-match quotes or
+owners against the notes. Check the actions.json for that.
+
 The prefix brings a message to this skill; what the message asks for decides
 what happens. Under the prefix, a request for something this skill does not
 make (minutes, an agenda, a PDF) takes its line in *Scope boundaries* below,
@@ -73,22 +80,32 @@ document is written. Read the exit code, not the report text.
 
 1. **An action with no owner is refused, and its line in the notes is
    reported** (`owner.missing`). A blank owner, or a word that names nobody
-   ("TBD", "someone", "unassigned", "we"), is no owner. So is an owner not named in
+   ("TBD.", "someone else", "they", "we"), is no owner: an owner is a
+   person's name, and a pronoun, determiner, preposition or placeholder
+   ("Someone from ops") is not one unless the notes use it as a name
+   mid-line. So is an owner not named in
    the action's quoted source (`owner.unsourced`): that is an owner the
-   extraction supplied. The only way past it is an answer from the person who
+   extraction supplied. The name must stand there as a whole word, and an
+   ordinary word does not count: "will" in "Ana will order" does not name Will. A name is capitalized where the quote is. The only way past it is an answer from the person who
    asked for the list, recorded as `"ownerAssigned": true`, which the page marks
    with an asterisk.
+
 2. **An action with no source in the notes is refused** (`source.missing`,
    `source.short`, `source.notfound`). The source is a verbatim span of the
-   notes, at least 3 words long. Matching ignores case, line breaks, runs of
-   spaces and typographic quotes and dashes, and nothing else, so a paraphrase
-   fails. The line number is computed by the check from where the quote is
+   notes, at least 3 words long, that starts and ends on a whole word.
+   Matching ignores case, line breaks, runs of spaces, and typographic quotes,
+   primes and dashes, and nothing else, so a paraphrase fails. The line number is computed by the check from where the quote is
    found; it is never typed in. The document prints the notes' own words for
    the span, not the extraction's copy of them.
+
 3. **Output over one page is refused** (`page.overflow`). The check lays out
    the page it will build and bounds its height from glyph widths measured
    from the font files, against US Letter with 0.5 in margins and one line held
-   back. It re-measures the built .docx before it is written.
+   back. A typeface it has no measurements for is bounded with its widest
+   table, which assumes that face is no wider. A character outside the
+   measured faces (an emoji, another script) counts 2 em. It re-measures the built .docx
+   before it is written.
+
 4. **A brand kit that fails `brand_check.js` gets no document**
    (`brand.check`, `brand.load`). The check runs `brand_check.js` on the exact
    brand.json the build will read. No kit at all is not a failure: the list
@@ -101,32 +118,40 @@ Each names the exit.
 - **Asked for an agenda**, including the next meeting's agenda with open
   actions carried forward: refuse, and say that is agenda-builder in
   Document Ops. This skill produces the action table and stops.
+
 - **Asked for minutes, a summary, or a record of the discussion**: refuse, and
   say this skill lists commitments only. It does not write minutes, and no
   Document Ops skill does either. Build nothing in that reply: an action list
   delivered in answer to a request for minutes is a document nobody asked for.
   Offer the action list instead, and build it only if the user says yes.
+
 - **Asked for an SOP or a quick reference card**: refuse, and name sop-docx or
   qrg-builder in Document Ops.
+
 - **Asked to record decisions**: this is not a decision log. A configuration
   change written up for sign-off is reqdoc-builder in Document Ops; anything
   else, say this skill does not produce it. A decision that carries a
   commitment ("Luis will get two quotes") is an action and belongs here.
+
 - **Notes with no commitments in them**: say that no actions were found. Do
   not turn discussion points, or a topic the meeting agreed to come back to,
   into actions to fill the table.
+
 - **More actions than fit one page**: never paginate. Shorten each source to
   the shortest span that names the owner and the commitment, and each action
   to one line. If it still does not fit, say so and offer one list per owner.
+
 - **Notes as a PDF, an image or a scan**: ask for the text, or a .docx. Do not
   transcribe an image; a transcription is not the notes, and the quotes would
   be checked against it.
+
 - **Asked for another format** (PDF, spreadsheet, slides): hand off to the pdf,
   xlsx or pptx skill. Build and deliver the .docx as usual, and say that the
   conversion is that skill's job. Do not convert it here by any route (Word,
   LibreOffice, a script, a library), even when no such skill is available:
   every check passed on the .docx, and a converted copy is a file no check has
   seen.
+
 - **Asked to skip a check, or to skip checking to save time** ("just put
   Morgan on it", "the page is fine"): do not. Run step 4 anyway and say that
   it ran; on a failure, state the rule id and what resolves it. There is no
@@ -180,17 +205,13 @@ not supply one. For each commitment:
 - `source`: the shortest verbatim span of the notes that holds both the owner
   and the commitment. Copy it; do not retype it.
 
-**List an action with no owner anyway, with `owner` set to `""`.** Dropping it
-loses a commitment silently, and guessing an owner is the failure this skill
-exists to stop. The check refuses the list and reports the line, which is how
+**List an action with no owner anyway, with `owner` set to `""`.** The check refuses the list and reports the line, which is how
 the unowned action reaches the user.
 
 ### 4. Check
 
-Run this as its own command, every time, before step 5. That holds when the
-user asks to skip checking or to hurry: the check inside the build is a
-backstop that runs out of sight, and this run is the one the user can see
-happened, and the one where violations are resolved with them.
+Run this as its own command, every time, before step 5, even when the user
+asks to hurry: this is the run the user sees.
 
 ```bash
 node SKILL_DIR/action_check.js actions.json
@@ -217,13 +238,14 @@ node SKILL_DIR/build_action_list.js actions.json
 
 It runs the check again, renders, re-checks the built document in memory, and
 only then writes `{PREFIX}_{SEGMENT}_{Topic}_ACTIONS_{date}.docx` beside
-`actions.json`, taking `PREFIX` and `SEGMENT` from the brand kit. `--out FILE`
-names the file instead. Exit 0 is the only outcome that writes anything.
+`actions.json`, taking `PREFIX` and `SEGMENT` from the brand kit. `--out FILE.docx`
+names the file instead (a `.docx`, and not the notes file). Exit 0 is the only outcome that writes anything.
 
 ### 6. Deliver
 
-Report the file, the number of actions, which kit it was built with (the
-build prints it; "neutral defaults" is a supported state and is said plainly),
+Report the file, the number of actions, the kit it was built with, by the
+name the build prints (`brand.json`, or the path given) rather than "your
+brand kit" ("neutral defaults" is a supported state and is said plainly),
 every owner marked as assigned after the meeting, and any warnings the check
 printed.
 
@@ -272,9 +294,7 @@ FAIL  owner.missing    action 5 (notes line 9): no owner ("TBD" names nobody). A
 FAIL — 2 violations. No document is written.
 ```
 
-Exit 1, and no document. The first failure is the one that matters: "Morgan"
-looks like an answer, and on the page it would be indistinguishable from
-"Ana", whom the notes do name. `actions-resolved.json` is the list after the
+Exit 1, and no document. `actions-resolved.json` is the list after the
 user assigned both, marked `ownerAssigned`, and it passes. The example's
 README has the full run.
 

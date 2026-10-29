@@ -23,14 +23,17 @@ in neutral defaults, and that is a supported state rather than an error.
     action-list/
       SKILL.md               the skill itself
       SETUP.md               this file
+      NOT_CHECKED.md         the SKILL.md rules no tool checks
       LICENSE.txt            terms — this skill is free, under MIT; section 2
       package.json           metadata; declares no dependencies
       check_deps.js          preflight: files, the bundled library, and the
                              checker's verdict on both examples
       action_check.js        the checker: owners, sources, one page, brand kit
+      actions.schema.json    the keys actions.json may hold; the checker reads it
       build_action_list.js   the builder: writes nothing unless the checker passes
       brand_kit.js           the brand kit loader, shared with brand-kit
       brand_check.js         the brand kit validator, shared with brand-kit
+      brand_rules.js         the kit rules both of those run, shared with brand-kit
       vendor/docx.cjs        the docx library, 9.7.1, MIT
       vendor/THIRD_PARTY_LICENSES.txt
       examples/roastery-weekly/   a clean list and its built .docx
@@ -86,18 +89,20 @@ your working folder, never in a skill folder.
 
 ## Prove it end to end
 
-From inside the `action-list` folder:
+Copy `notes.txt`, `actions.json` and `brand.json` from the skill's
+`examples/roastery-weekly` folder into an empty working folder of your own,
+open a terminal there, and build, giving the path to the installed
+`action-list` folder:
 
-    cd examples/roastery-weekly
-    node ../../build_action_list.js actions.json --kit .
+    node PATH/TO/action-list/build_action_list.js actions.json --kit .
 
 Expected: two `PASS` reports, the first on the input and the second on the
-built document, then `Replaced ...ROAST_OPS_Roastery_Operations_Weekly_ACTIONS_2026-04-23.docx`.
-Open it: one page, six rows, each with its source line.
+built document, then `Wrote ...ROAST_OPS_Roastery_Operations_Weekly_ACTIONS_2026-04-23.docx`
+in that folder. Open it: one page, six rows, each with its source line.
 
-Then the refusal:
+Then the refusal, which only reads, from inside the `action-list` folder:
 
-    cd ../unowned-action
+    cd examples/unowned-action
     node ../../action_check.js actions.json --kit .
 
 Expected: two `FAIL` lines and exit 1. The README in that folder explains both.
@@ -158,8 +163,9 @@ this skill.
 
 MIT. `LICENSE.txt` ships in every skill in this catalog and states two sets of
 terms, because some of them are sold; its section 1 names this one as free, and
-section 2 is the MIT text. That covers every file here, `brand_kit.js` and
-`brand_check.js` included — they belong to `brand-kit`, which is free too.
+section 2 is the MIT text. That covers every file here but `vendor/` (below);
+`brand_kit.js`, `brand_check.js` and `brand_rules.js` are included — they
+belong to `brand-kit`, which is free too.
 `vendor/docx.cjs` is the docx library, third-party and MIT, with its notices in
 `vendor/THIRD_PARTY_LICENSES.txt`.
 

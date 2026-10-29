@@ -17,7 +17,8 @@
  * Exit codes:
  *   0  written
  *   1  refused by a check; nothing written
- *   2  usage error, or an input that could not be read; nothing written
+ *   2  usage error, an input that could not be read, or a render that
+ *      failed; nothing written
  */
 
 const fs = require('fs');
@@ -39,8 +40,9 @@ for (let i = 0; i < argv.length; i++) {
   else pos.push(argv[i]);
 }
 if (pos.length !== 1 || path.extname(pos[0]).toLowerCase() !== '.json') usage();
-// Before anything resolves the kit: the check and the loader below both read
-// it, and they must read the same one.
+if (out && path.extname(out).toLowerCase() !== '.docx') usage('--out must name a .docx file, not ' + out);
+// Before anything resolves the kit: the check reads it, and the build uses
+// the kit the check read.
 if (kit) process.env.HPW_BRAND_KIT = path.resolve(kit);
 
 const AC = require('./action_check.js');
@@ -53,12 +55,8 @@ if (pre.exitCode !== 0) {
   process.exit(pre.exitCode);
 }
 
-const BRAND = require('./brand_kit.js').load();
-if ((BRAND._configPath || null) !== (pre.brand.configPath || null)) {
-  console.log('The brand kit the check read (' + pre.brand.configPath + ') is not the one the build loaded (' +
-    BRAND._configPath + '). Nothing written.');
-  process.exit(2);
-}
+// The kit the check read and passed, not a second load of it.
+const BRAND = pre.brandKit;
 
 const docx = require('./vendor/docx.cjs');
 const {
@@ -68,14 +66,15 @@ const {
 } = docx;
 const { LAYOUT } = AC;
 const L = pre.layout;
-const FONT = (BRAND.type && BRAND.type.FONT) || 'Arial';
-const ORG = (BRAND.org && (BRAND.org.shortName || BRAND.org.name)) || '';
+// The kit's text prints only its visible characters (action_check.js visible()),
+// the same strings the check laid out and measured.
+const FONT = AC.visible(BRAND.type.FONT);
+const ORG = AC.visible(BRAND.org.shortName);
 
 // --- the primitives this builder needs -------------------------------------
-// Inlined rather than taken from the document pack's sop_helpers.js, so every
-// file in this skill ships under this skill's own terms. There is nothing to
-// keep in step: this page is one table of text, and the geometry it is laid
-// out against lives in action_check.js, which measured it.
+// This page is the header band, a meta line, the action table and a footer
+// line; the geometry it is laid out against lives in action_check.js, which
+// measured it.
 const WHITE = 'FFFFFF';
 const DARK = '212121';   // body text
 const MID = '555555';    // secondary text
@@ -101,8 +100,8 @@ const cell = (children, width, o = {}) => new TableCell({
   children,
   // ShadingType.CLEAR, always: SOLID renders black whatever the fill says.
   ...(o.bg ? { shading: { type: ShadingType.CLEAR, fill: o.bg, color: 'auto' } } : {}),
-  ...(o.borders ? { borders: o.borders } : {}),
-  ...(o.margins ? { margins: o.margins } : {}),
+  borders: o.borders,
+  margins: o.margins,
   ...(o.va === 'center' ? { verticalAlign: VerticalAlign.CENTER } : {}),
 });
 
@@ -157,9 +156,8 @@ const head = new TableRow({
   children: L.head.map((paras, k) => cell(
     paras.map((p) => mkPara(p, WHITE)),
     LAYOUT.COLS[k].w,
-    // No borders: the fill is the edge. Word runs a cell's side borders on down
-    // through the next row's top padding, so bordered header cells printed dark
-    // stubs into the first action row (Decision 181).
+    // No borders: the fill is the edge. Word draws a cell's side borders on
+    // down through the next row's top padding.
     { bg: DACCENT, borders: { top: B0, bottom: B0, left: B0, right: B0 }, margins: { top: LAYOUT.HEAD.PAD_V, bottom: LAYOUT.HEAD.PAD_V, left: C.PAD_H, right: C.PAD_H }, va: 'center' },
   )),
 });
@@ -195,9 +193,14 @@ const doc = new Document({
 });
 
 const target = out ? path.resolve(out) : path.join(path.dirname(file), AC.outputName(pre.model, BRAND));
+// The notes are what the quotes were checked against; writing over them would
+// leave a list that no longer passes its own check.
+if (path.resolve(path.dirname(file), pre.model.notes).toLowerCase() === target.toLowerCase()) {
+  usage('--out names the notes file (' + pre.model.notes + '); choose another name');
+}
 
 Packer.toBuffer(doc).then((buf) => {
-  const post = AC.checkDocxBuffer(buf, path.basename(target));
+  const post = AC.checkDocxBuffer(buf, path.basename(target), { notes: pre.notesData.text });
   console.log('');
   console.log(AC.report(post));
   if (post.exitCode !== 0) {
@@ -208,7 +211,8 @@ Packer.toBuffer(doc).then((buf) => {
   fs.writeFileSync(target, buf);
   console.log('');
   console.log((existed ? 'Replaced ' : 'Wrote ') + target);
-  console.log('  ' + pre.model.actions.length + ' actions; brand ' +
+  const nAct = pre.model.actions.length;
+  console.log('  ' + nAct + ' action' + (nAct === 1 ? '' : 's') + '; brand ' +
     (BRAND._source === 'config' ? BRAND._configPath : 'neutral defaults (no brand.json found)'));
 }).catch((e) => {
   console.error('build_action_list: the document could not be rendered: ' + e.message);
