@@ -1,0 +1,18 @@
+{
+  "name": "action-list",
+  "version": "1.1.0",
+  "description": "Turns meeting notes into a one-page action list as a Word document: owner, action, due date, and the line in the notes each action came from.",
+  "author": {
+    "name": "Happy Path Works",
+    "email": "hello@happypath.works"
+  },
+  "homepage": "https://github.com/happypathworks/action-list",
+  "repository": "https://github.com/happypathworks/action-list",
+  "license": "MIT",
+  "keywords": ["meeting-notes", "action-items", "docx", "word", "owners", "follow-up"],
+  "icon": "./.claude-plugin/icon.png",
+  "documentationUrl": "https://happypath.works/free/action-list/",
+  "supportUrl": "https://happypath.works/policies/#support",
+  "privacyPolicyUrl": "https://happypath.works/policies/#privacy",
+  "termsOfServiceUrl": "https://happypath.works/policies/#license"
+}
