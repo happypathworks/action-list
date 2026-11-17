@@ -64,9 +64,14 @@ list and the one-page .docx it builds.
 The packaged download, this skill and `brand-kit` as two `.skill` files in
 one zip, is free on Gumroad:
 [happypathworks.gumroad.com/l/action-list](https://happypathworks.gumroad.com/l/action-list).
-Or use this repository as it is:
+Or use this repository as it is.
 
-Put the whole folder where your Claude surface keeps skills, as
+In Claude Code, the [`skills` CLI](https://skills.sh/) installs it with one
+command, into `.claude/skills/action-list/` under the folder you run it from:
+
+    npx skills add happypathworks/action-list --agent claude-code
+
+Or put the whole folder where your Claude surface keeps skills, as
 `action-list/`:
 
 - Claude Code, for you on this machine: `~/.claude/skills/action-list/`
