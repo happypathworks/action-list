@@ -21,7 +21,7 @@ action_check — actions.json (before build)
   page: 5720 of 14160 twips (40%), 5 action rows, standard width table
 
   FAIL  owner.unsourced  action 3 (notes line 7): owner "Morgan" is not named in the quoted source. If the notes name the owner nearby, widen the quote to include the name. If they do not, ask who owns it; set "ownerAssigned": true only on that answer.
-  FAIL  owner.missing    action 5 (notes line 9): no owner ("TBD" names nobody). Ask who owns it; do not pick one.
+  FAIL  owner.missing    action 5 (notes line 9): no owner ("TBD" names nobody). Ask the user who owns it, quoting the line; do not pick one. If they name someone, record that name with "ownerAssigned": true. If they confirm nobody owns it yet, leave owner out and set "unowned": true.
 
 FAIL — 2 violations. No document is written.
 ```

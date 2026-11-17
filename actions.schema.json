@@ -14,10 +14,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["owner", "action", "source"],
+        "required": ["action", "source"],
         "properties": {
           "owner": {"type": "string"},
           "ownerAssigned": {"type": "boolean"},
+          "unowned": {"type": "boolean"},
           "action": {"type": "string"},
           "due": {"type": "string"},
           "source": {"type": "string"}

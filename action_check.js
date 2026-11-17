@@ -497,6 +497,13 @@ function namesNobody(owner, notes) {
   return notAName(owner, notes, false) !== null;
 }
 
+// A confirmed unowned action: the owner cell it prints, the
+// footnote that must stand beside it, and the phrasing a quote uses when it
+// does name who does the action ("Dana will ...", "Brian agreed to ...").
+const UNOWNED_CELL = 'No owner yet †';
+const UNOWNED_FOOT = '† No owner named at the meeting; confirmed unowned when this list was written.';
+const DOER = new RegExp('((?:\\p{Lu}[\\p{L}\'’-]*\\s+)?\\p{Lu}[\\p{L}\'’-]*)\\s+(?:will|agreed to|volunteered|offered|is going to|takes|took|owns)\\b', 'gu');
+
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
   'september', 'october', 'november', 'december'];
 
@@ -640,7 +647,7 @@ function buildLayout(model, brand, quotes, notes) {
     const due = String(a.due || '').trim();
     return [
       [para([{ t: String(i + 1), sz: S.BODY }])],
-      [para([{ t: String(a.owner || '').trim() + (a.ownerAssigned ? ' *' : ''), sz: S.BODY }])],
+      [para([{ t: a.unowned === true ? UNOWNED_CELL : String(a.owner || '').trim() + (a.ownerAssigned ? ' *' : ''), sz: S.BODY }])],
       [para([{ t: String(a.action || '').trim(), sz: S.BODY }])],
       [para([due ? { t: due, sz: S.BODY } : { t: 'Not stated', i: true, sz: S.BODY, role: 'muted' }])],
       [para([{ t: q ? sourceLabel(q) + '  ' : '', sz: S.BODY, role: 'muted' }, { t: '"' + (q ? visible(q.span) : '') + '"', i: true, sz: S.BODY, role: 'muted' }])],
@@ -648,9 +655,11 @@ function buildLayout(model, brand, quotes, notes) {
   });
 
   const anyAssigned = model.actions.some((a) => a.ownerAssigned);
+  const anyUnowned = model.actions.some((a) => a.unowned === true);
   const foot = para([{
     t: 'Each source is quoted from ' + notes.name + '; L gives the ' + notes.unit + ' it starts on.' +
-      (anyAssigned ? ' * Owner assigned after the meeting: the notes name no owner for that action.' : ''),
+      (anyAssigned ? ' * Owner assigned after the meeting: the notes name no owner for that action.' : '') +
+      (anyUnowned ? ' ' + UNOWNED_FOOT : ''),
     sz: S.SMALL, role: 'muted',
   }], { before: LAYOUT.FOOT.BEFORE, after: LAYOUT.FOOT.AFTER });
 
@@ -742,8 +751,17 @@ function distance(a, b) {
   return d[a.length][b.length];
 }
 
-/** [{id, msg}] for every unknown key and wrong type under `where`. */
+/** [{id, msg}] for every unknown key, missing required key and wrong type under `where`. */
 function shapeErrors(v, s, where, out) {
+  // The schema's "required" list is read here too: before, it
+  // was written in the schema and enforced only where a rule happened to.
+  if (typeName(v) === 'object' && s.type === 'object') {
+    for (const k of s.required || []) {
+      if (!Object.prototype.hasOwnProperty.call(v, k)) {
+        out.push({ id: 'schema.required', msg: (where ? where + '.' : '') + k + ' is required and missing' });
+      }
+    }
+  }
   const t = typeName(v);
   if (t !== s.type) {
     out.push({ id: 'schema.type', msg: (where || 'the file') + ' must be ' + (s.type === 'array' ? 'an array' : s.type === 'object' ? 'an object' : 'a ' + s.type) +
@@ -843,9 +861,25 @@ function checkModel(file) {
     const nobody = wordsOf(owner).length === 1 && namesNobody(owner, notes.text) ? [owner] : parts.filter((p) => namesNobody(p, notes.text));
     // Capitals tell a name only where the quote uses them; with no quote, the owner is the user's answer.
     const capitals = q ? /\p{Lu}/u.test(q.span) : true;
-    if (!owner || nobody.length) {
+    // "unowned": true is the user's answer that nobody owns it yet.
+    // It stands alone: an owner written beside it is a contradiction to resolve,
+    // and a quote that names who does it is not an action nobody owns.
+    if (a.unowned === true) {
+      if (owner || a.ownerAssigned) {
+        V(res, 'owner.unowned', 'action ' + n + where + ': "unowned" is set, and so is ' + (owner ? 'owner "' + owner + '"' : '"ownerAssigned"') +
+          '. Keep one: the owner the user named, or "unowned" if they confirmed nobody owns it yet.', tag);
+      } else if (q) {
+        const doers = [...q.span.replace(/\p{Cf}/gu, '').matchAll(DOER)].map((m) => m[1])
+          .filter((d) => !namesNobody(d, notes.text) && usedAsName(d.split(/\s+/).pop(), notes.text));
+        if (doers.length) {
+          V(res, 'owner.unsourced', 'action ' + n + where + ': "unowned" is set, but its quoted source names "' + doers.join('", "') +
+            '" as the one who does it. An unowned action is one the notes give nobody; record the person the notes name.', tag);
+        }
+      }
+    } else if (!owner || nobody.length) {
       V(res, 'owner.missing', 'action ' + n + where + ': no owner' + (owner ? ' ("' + nobody.join('", "') + '" names nobody)' : '') +
-        '. Ask who owns it; do not pick one.', tag);
+        '. Ask the user who owns it, quoting the line; do not pick one. If they name someone, record that name with "ownerAssigned": true. ' +
+        'If they confirm nobody owns it yet, leave owner out and set "unowned": true.', tag);
     } else if (!a.ownerAssigned && q) {
       const missing = parts.filter((part) => !namesOwner(q.span, part));
       if (missing.length) {
@@ -1126,7 +1160,11 @@ function checkDocxBuffer(buf, name, opts) {
     const text = (k) => cells[k].map((p) => p.text || '').join(' ').trim();
     const who = text(1);
     if (!who) V(res, 'owner.missing', 'row ' + n + ': the owner cell is empty', { action: n });
-    else {
+    else if (who === UNOWNED_CELL) {
+      // The cell the builder prints for a confirmed unowned action; it stands
+      // only with the footnote that says so.
+      if (!xml.includes(UNOWNED_FOOT)) V(res, 'owner.missing', 'row ' + n + ': the owner cell says "' + who + '" and the page carries no footnote saying it was confirmed', { action: n });
+    } else {
       // The rule checkModel applied, with the source cell's quote standing in for the span.
       const quote = text(4).replace(/^L\d+(?:-\d+)?\s+/, '');
       const capitals = /\p{Lu}/u.test(quote);

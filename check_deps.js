@@ -27,7 +27,6 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { spawnSync } = require('child_process');
 
 const asJson = process.argv.includes('--json');
 const ROOT = __dirname;
@@ -90,18 +89,26 @@ if (docx) {
     kit ? 'resolved ' + kit._source + ', palette ACCENT ' + kit.palette.ACCENT : 'failed to load: ' + err, REINSTALL);
 }
 
-// --- 5. The scripts answer, and the checker agrees with its examples ----------
-function run(script, args, cwd) {
-  const env = Object.assign({}, process.env);
-  delete env.HPW_BRAND_KIT;
-  return spawnSync(process.execPath, [path.join(ROOT, script)].concat(args), { cwd: cwd || ROOT, encoding: 'utf8', env });
+// --- 5. The scripts load, and the checker agrees with its examples ------------
+// Everything runs in this process: the checker is loaded as a module and
+// called directly, the way build_action_list.js calls it. Nothing is spawned.
+// Loading a script parses all of it, so a truncated or garbled copy fails here.
+function loadScript(script) {
+  try { return { mod: require(path.join(ROOT, script)), err: '' }; }
+  catch (e) { return { mod: null, err: e.code || e.message }; }
 }
 
-for (const script of ['action_check.js', 'build_action_list.js']) {
-  const r = run(script, []);
-  add(script + ' runs', r.status === 2, r.status === 2 ? 'usage check returns exit 2 as designed' : 'unexpected exit ' + r.status,
-    'A script the skill depends on does not run. ' + REINSTALL);
-}
+const ac = loadScript('action_check.js');
+const AC = ac.mod && typeof ac.mod.checkModel === 'function' && typeof ac.mod.checkDocx === 'function' ? ac.mod : null;
+add('action_check.js loads', !!AC,
+  AC ? 'loads; exports checkModel and checkDocx' : ac.mod ? 'loads, but checkModel or checkDocx is missing' : 'not loadable (' + ac.err + ')',
+  'A script the skill depends on does not load. ' + REINSTALL);
+
+// build_action_list.js stops at its load guard when it is not the program
+// being run, so this proves the file is whole without building anything.
+const bl = loadScript('build_action_list.js');
+add('build_action_list.js loads', !bl.err, bl.err ? 'not loadable (' + bl.err + ')' : 'parses and loads',
+  'A script the skill depends on does not load. ' + REINSTALL);
 
 const expectations = [
   { dir: EX_CLEAN, file: 'actions.json', exit: 0, ids: [] },
@@ -110,14 +117,20 @@ const expectations = [
   { dir: EX_REFUSED, file: 'actions-resolved.json', exit: 0, ids: [] },
 ];
 for (const x of expectations) {
-  const r = run('action_check.js', [x.file, '--kit', '.', '--json'], path.join(ROOT, x.dir));
-  let got = null;
-  try { got = JSON.parse(r.stdout); } catch (_) { /* reported below */ }
-  const ids = got ? got.violations.map((v) => v.id).sort() : [];
-  const ok = r.status === x.exit && JSON.stringify(ids) === JSON.stringify(x.ids.slice().sort());
-  add('checker verdict: ' + x.dir.split('/')[1] + '/' + x.file.replace(/^ROAST_.*docx$/, 'built .docx'), ok,
-    'exit ' + r.status + (ids.length ? ' [' + ids.join(', ') + ']' : '') + ', expected ' + x.exit + (x.ids.length ? ' [' + x.ids.slice().sort().join(', ') + ']' : ''),
-    'The checker does not return the verdict its example is documented to get, so its verdicts cannot be trusted here. ' + REINSTALL);
+  const name = 'checker verdict: ' + x.dir.split('/')[1] + '/' + x.file.replace(/^ROAST_.*docx$/, 'built .docx');
+  const want = 'expected ' + x.exit + (x.ids.length ? ' [' + x.ids.slice().sort().join(', ') + ']' : '');
+  const fix = 'The checker does not return the verdict its example is documented to get, so its verdicts cannot be trusted here. ' + REINSTALL;
+  if (!AC) { add(name, false, 'skipped — action_check.js did not load, ' + want, fix); continue; }
+  // The example's own kit, as `--kit .` from the example folder would give it.
+  process.env.HPW_BRAND_KIT = path.join(ROOT, x.dir);
+  const file = path.join(ROOT, x.dir, x.file);
+  let res = null, threw = '';
+  try { res = /\.json$/i.test(file) ? AC.checkModel(file) : AC.checkDocx(file); }
+  catch (e) { threw = e.message; }
+  if (!res) { add(name, false, 'the checker failed before a verdict (' + threw + '), ' + want, fix); continue; }
+  const ids = (res.violations || []).map((v) => v.id).sort();
+  const ok = res.exitCode === x.exit && JSON.stringify(ids) === JSON.stringify(x.ids.slice().sort());
+  add(name, ok, 'exit ' + res.exitCode + (ids.length ? ' [' + ids.join(', ') + ']' : '') + ', ' + want, fix);
 }
 
 // --- report -------------------------------------------------------------------

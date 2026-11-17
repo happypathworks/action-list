@@ -24,6 +24,9 @@
 const fs = require('fs');
 const path = require('path');
 
+// check_deps.js loads this file to prove it is whole. Loaded, not run: stop.
+if (require.main !== module) return;
+
 function usage(msg) {
   if (msg) process.stderr.write('build_action_list: ' + msg + '\n');
   process.stderr.write('usage: node build_action_list.js <actions.json> [--out FILE.docx] [--kit PATH]\n');

@@ -22,7 +22,7 @@ compatibility: >
   `node check_deps.js` from the skill folder to confirm before building. See
   SETUP.md.
 metadata:
-  version: 1.1.0
+  version: 1.2.0
 ---
 
 # action-list
@@ -88,7 +88,12 @@ document is written. Read the exit code, not the report text.
    extraction supplied. The name must stand there as a whole word, and an
    ordinary word does not count: "will" in "Ana will order" does not name Will. A name is capitalized where the quote is. The only way past it is an answer from the person who
    asked for the list, recorded as `"ownerAssigned": true`, which the page marks
-   with an asterisk.
+   with an asterisk. **Nobody owns it yet is an answer too:** when the user
+   confirms that, leave `owner` out and set `"unowned": true`. The page prints
+   "No owner yet" with a footnote saying it was confirmed. Set it only on the
+   user's answer; an action whose quote names who does it is refused as
+   unowned (`owner.unsourced`), and `unowned` beside an owner is refused
+   (`owner.unowned`).
 
 2. **An action with no source in the notes is refused** (`source.missing`,
    `source.short`, `source.notfound`). The source is a verbatim span of the
@@ -221,7 +226,8 @@ Exit 0: build. Exit 1: resolve each violation, then re-run.
 
 | Rule | Resolution |
 |---|---|
-| `owner.missing` | Ask the user who owns it, quoting the line. On an answer, set `owner` and `"ownerAssigned": true`. If they say drop it, remove it. |
+| `owner.missing` | Ask the user who owns it, quoting the line. On a name, set `owner` and `"ownerAssigned": true`. If they confirm nobody owns it yet, leave `owner` out and set `"unowned": true`. If they say drop it, remove it. |
+| `owner.unowned` | `unowned` set beside an owner: keep the user's answer, the name or `unowned`. |
 | `owner.unsourced` | If the notes name the owner near the line, widen `source` to include the name. If not, treat it as `owner.missing`. |
 | `source.*` | Re-copy the span from the notes. |
 | `page.overflow` | Shorten sources and actions as above; if still over, offer one list per owner. |
@@ -289,7 +295,7 @@ produces: the first given to Morgan, who chaired the meeting, and the second to
 
 ```
 FAIL  owner.unsourced  action 3 (notes line 7): owner "Morgan" is not named in the quoted source. ...
-FAIL  owner.missing    action 5 (notes line 9): no owner ("TBD" names nobody). Ask who owns it; do not pick one.
+FAIL  owner.missing    action 5 (notes line 9): no owner ("TBD" names nobody). Ask the user who owns it, quoting the line; do not pick one. ...
 
 FAIL — 2 violations. No document is written.
 ```
@@ -309,7 +315,7 @@ Before reporting a list as done:
 - [ ] `build_action_list.js` exited 0, read from the exit code
 - [ ] the .docx is the only file delivered: no PDF or other conversion made
       here
-- [ ] every owner marked with an asterisk was assigned by the user in this
-      conversation, not inferred
+- [ ] every owner marked with an asterisk, and every action marked unowned,
+      was the user's answer in this conversation, not inferred
 - [ ] `notes.txt`, if written from pasted text, is the paste unchanged
 - [ ] the kit the build reports is the one the user expects
