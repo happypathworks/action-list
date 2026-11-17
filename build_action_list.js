@@ -190,8 +190,9 @@ const doc = new Document({
     },
     // The footer paragraph closes the body. Word needs a paragraph after a
     // table at the end of a document; without one it adds an empty one, and
-    // on a full page that empty paragraph is a second page.
-    children: [band, mkPara(L.meta, MID), actions, mkPara(L.foot, MID)],
+    // on a full page that empty paragraph is a second page. The flags block,
+    // when there is one, follows the footer and may run onto page two.
+    children: [band, mkPara(L.meta, MID), actions, mkPara(L.foot, MID)].concat(L.flags.map((p) => mkPara(p, MID))),
   }],
 });
 

@@ -9,6 +9,7 @@
     "date": {"type": "string"},
     "segment": {"type": "string"},
     "notes": {"type": "string"},
+    "notActions": {"type": "array", "items": {"type": "string"}},
     "actions": {
       "type": "array",
       "items": {
@@ -21,6 +22,7 @@
           "unowned": {"type": "boolean"},
           "action": {"type": "string"},
           "due": {"type": "string"},
+          "dueFirm": {"type": "boolean"},
           "source": {"type": "string"}
         }
       }

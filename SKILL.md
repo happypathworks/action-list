@@ -50,8 +50,14 @@ list that reads as settled. Three things in it are not.
    with long wording, the table spills, and the overflow page carries the rows
    nobody reads.
 
-None of the three raises an error. `action_check.js` gives each an exit code,
-and the builder writes nothing until it returns 0.
+4. **A commitment left out, and a hedged date printed as a deadline.** A line
+   that names nobody ("someone needs to send the update") is the one most
+   often dropped, and "possibly by the 14th, depending on QA" comes back as
+   due "the 14th". The list looks complete and firm, and is neither.
+
+None of these raises an error. `action_check.js` gives the first three an exit
+code, and the builder writes nothing until it returns 0. The fourth is a
+question for the user (*Questions before the build*, below).
 
 ## Trigger
 
@@ -103,18 +109,44 @@ document is written. Read the exit code, not the report text.
    found; it is never typed in. The document prints the notes' own words for
    the span, not the extraction's copy of them.
 
-3. **Output over one page is refused** (`page.overflow`). The check lays out
+3. **An action table over one page is refused** (`page.overflow`). The check lays out
    the page it will build and bounds its height from glyph widths measured
    from the font files, against US Letter with 0.5 in margins and one line held
    back. A typeface it has no measurements for is bounded with its widest
    table, which assumes that face is no wider. A character outside the
    measured faces (an emoji, another script) counts 2 em. It re-measures the built .docx
-   before it is written.
+   before it is written. The bound covers the band, the table and its footer;
+   the flags block under them (below) is outside it and may run to a second
+   page.
 
 4. **A brand kit that fails `brand_check.js` gets no document**
    (`brand.check`, `brand.load`). The check runs `brand_check.js` on the exact
    brand.json the build will read. No kit at all is not a failure: the list
    builds with the neutral defaults.
+
+## Questions before the build
+
+Two rules warn instead of failing. Each is a question for the user; the
+answer goes into actions.json, and a question left unanswered still builds,
+with a flag printed under the table.
+
+- **A commitment no action lists** (`coverage.unlisted`). A notes line worded
+  like a task someone will do or that needs doing ("will", "needs to",
+  "Luis to confirm", and the like) that no action quotes. Ask
+  whether it is an action, quoting the line. If it is, list it. If not, copy
+  the line into `notActions`. Unanswered, the flag names the line.
+- **A hedged date** (`due.hedged`). The notes hedge the due date ("possibly",
+  "depending on", "if", "aim for", and the like) and the due value drops the
+  hedge. The check reads the whole notes line, not the quote, so trimming the
+  hedge out of the quote does not hide it. Ask whether the date is firm. If
+  it is, or the user gives a firm date, set `due` to it and `"dueFirm": true`.
+  Unanswered, the due cell prints the notes' own words, marked ‡, and the flag
+  says the date was not confirmed. A due value that keeps the hedge
+  ("possibly by the 14th, depending on QA") already says so, and is not
+  flagged.
+
+The flags print under the footer, headed "Flags: not confirmed when this list
+was written". Both rules match word lists; *NOT_CHECKED.md* says what they miss.
 
 ## Scope boundaries
 
@@ -205,8 +237,9 @@ not supply one. For each commitment:
   each as written.
 - `action`: the commitment as a short imperative, one line where possible.
 - `due`: as the notes state it ("by Friday", "April 30"), or `""` when they
-  state none. Do not convert a relative date, and do not supply one. A due
-  value not found in the quote is reported as a warning.
+  state none, keeping any hedge the notes put on it ("possibly by the 14th,
+  depending on QA"). Do not convert a relative date, and do not supply one. A
+  due value not found in the quote is reported as a warning.
 - `source`: the shortest verbatim span of the notes that holds both the owner
   and the commitment. Copy it; do not retype it.
 
@@ -222,10 +255,16 @@ asks to hurry: this is the run the user sees.
 node SKILL_DIR/action_check.js actions.json
 ```
 
-Exit 0: build. Exit 1: resolve each violation, then re-run.
+Exit 1: resolve each violation, then re-run. Exit 0 with a `coverage.unlisted`
+or `due.hedged` warning: ask the user about each, in one message, quoting the
+lines, record the answers, and re-run. With no answer, or on a request to
+build anyway, build: the open questions print as flags. Exit 0 with neither: build.
 
 | Rule | Resolution |
 |---|---|
+| `coverage.unlisted` | Ask whether the line is an action. If it is, list it (owner `""` when the notes name nobody). If not, copy the line into `notActions`. |
+| `due.hedged` | Ask whether the date is firm. If it is, or the user gives a firm date, set `due` to it and `"dueFirm": true`. |
+| `notActions.notfound` | Re-copy the line from the notes, at least three words. |
 | `owner.missing` | Ask the user who owns it, quoting the line. On a name, set `owner` and `"ownerAssigned": true`. If they confirm nobody owns it yet, leave `owner` out and set `"unowned": true`. If they say drop it, remove it. |
 | `owner.unowned` | `unowned` set beside an owner: keep the user's answer, the name or `unowned`. |
 | `owner.unsourced` | If the notes name the owner near the line, widen `source` to include the name. If not, treat it as `owner.missing`. |
@@ -252,8 +291,8 @@ names the file instead (a `.docx`, and not the notes file). Exit 0 is the only o
 Report the file, the number of actions, the kit it was built with, by the
 name the build prints (`brand.json`, or the path given) rather than "your
 brand kit" ("neutral defaults" is a supported state and is said plainly),
-every owner marked as assigned after the meeting, and any warnings the check
-printed.
+every owner marked as assigned after the meeting, every flag printed under the
+table, and any warnings the check printed.
 
 ## actions.json
 
@@ -274,6 +313,9 @@ printed.
 `notes` is resolved relative to actions.json. `date` is printed as given and
 used in the file name only when it is `YYYY-MM-DD`. `segment` is optional and
 must be one of the kit's `naming.SEGMENTS`. Line numbers are not a field.
+Two fields record the user's answers to the questions above and nothing else:
+`"dueFirm": true` on an action, and `notActions`, a list of notes lines copied
+verbatim.
 
 ## Where the brand kit comes from
 
@@ -315,7 +357,8 @@ Before reporting a list as done:
 - [ ] `build_action_list.js` exited 0, read from the exit code
 - [ ] the .docx is the only file delivered: no PDF or other conversion made
       here
-- [ ] every owner marked with an asterisk, and every action marked unowned,
-      was the user's answer in this conversation, not inferred
+- [ ] every owner marked with an asterisk, every action marked unowned, every
+      `dueFirm` and every `notActions` line was the user's answer in this
+      conversation, not inferred
 - [ ] `notes.txt`, if written from pasted text, is the paste unchanged
 - [ ] the kit the build reports is the one the user expects

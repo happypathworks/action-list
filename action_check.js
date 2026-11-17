@@ -79,6 +79,8 @@ const LAYOUT = Object.freeze({
   BORDER: 10, // a 0.5pt rule, counted once per row
   COUNT_LINE: Object.freeze({ BEFORE: 160, AFTER: 120 }),
   FOOT: Object.freeze({ BEFORE: 120, AFTER: 0 }),
+  // The flags block under the footer. Outside BUDGET: it may run to page two.
+  FLAGS: Object.freeze({ HEAD_BEFORE: 200, ITEM_BEFORE: 60 }),
   SIZE: Object.freeze({ TITLE: 28, SUBTITLE: 20, BAND: 18, BODY: 18, LABEL: 17, SMALL: 16 }),
   PITCH: Object.freeze({ 28: 380, 20: 280, 18: 240, 17: 240, 16: 240 }),
 });
@@ -504,6 +506,57 @@ const UNOWNED_CELL = 'No owner yet †';
 const UNOWNED_FOOT = '† No owner named at the meeting; confirmed unowned when this list was written.';
 const DOER = new RegExp('((?:\\p{Lu}[\\p{L}\'’-]*\\s+)?\\p{Lu}[\\p{L}\'’-]*)\\s+(?:will|agreed to|volunteered|offered|is going to|takes|took|owns)\\b', 'gu');
 
+// The two asking rules (ruled 2026-11-16): neither refuses the build. Each asks
+// the user; an answer is recorded in actions.json, and a question left
+// unanswered prints as a flag under the table.
+//
+// COMMITMENT: a notes line worded like a task someone will do or that needs
+// doing. "will" is matched in lower case only, so "Present: Ana, Will" is no
+// commitment. A line no action quotes, and the user has not called "not an
+// action" (notActions), is coverage.unlisted. A commitment worded off this
+// list goes unseen; NOT_CHECKED.md says so.
+const COMMITMENT = [
+  /\bwill\b/, /\b(?:needs?|has|have) to\b/i, /\bneeds? (?:someone|somebody)\b/i, /\bshould\b/i, /\bmust\b/i,
+  /\bgoing to\b/i, /\b(?:agreed|volunteered|offered) to\b/i, /\bfollow[- ]up\b/i, /\bto[- ]?do\b/i, /^\s*(?:action|ai)\s*:/i,
+  /(?:^|[-*•]\s*)\p{Lu}[\p{L}'’-]*(?: and \p{Lu}[\p{L}'’-]*)? to \p{Ll}/u, // "Luis to confirm", "Priya and Theo to send"
+];
+// HEDGE: a word that makes a date less than firm. In the sentence of the
+// action's notes line that holds its due value, or anywhere in that line when
+// the due value is not in it, it is due.hedged, unless the due value carries
+// the hedge itself or the user confirmed the date ("dueFirm": true).
+const HEDGE = /\b(?:possibly|maybe|perhaps|probably|hopefully|tentative(?:ly)?|ideally|roughly|approximately|around|aim(?:ing)? for|target(?:ing)?|depend(?:s|ing)? on|if|unless|assuming|pending|try(?:ing)? to|tb[cd]|or so)\b|-ish\b/i;
+// The mark a hedged due cell carries, and the heading of the block under the
+// table that says what each mark means. The block may run to a second page;
+// the table and its footer may not.
+const HEDGE_MARK = '‡';
+const FLAGS_HEAD = 'Flags: not confirmed when this list was written';
+const DATE_LEAD = /(?:\b(?:by|before|until|till|on|in|for|during|after|around)\s+)$/i;
+
+/**
+ * The notes' own words for a hedged due date, or null when the date is not
+ * hedged. Reads the whole notes line(s) the quote was found on, not the quote:
+ * an extraction can trim the hedge out of the span it copies.
+ */
+function hedgedDue(notesText, q, due) {
+  const lines = notesText.split(/\r\n|\r|\n/).slice(q.lineFrom - 1, q.lineTo).join(' ');
+  const sentences = visible(lines).replace(/\s+/g, ' ').trim().split(/(?<=[.!?;])\s+/);
+  const fd = fold(due).text;
+  const inDue = sentences.filter((s) => fold(s).text.includes(fd));
+  for (const s of inDue.length ? inDue : sentences) {
+    const h = HEDGE.exec(s);
+    if (!h) continue;
+    let from = h.index;
+    if (inDue.length) {
+      const f = fold(s);
+      const at = f.map[f.text.indexOf(fd)];
+      const lead = DATE_LEAD.exec(s.slice(0, at));
+      from = Math.min(from, lead ? at - lead[0].length : at);
+    }
+    return { words: s.slice(from).replace(/[\s.!?;,]+$/, ''), hedge: h[0] };
+  }
+  return null;
+}
+
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
   'september', 'october', 'november', 'december'];
 
@@ -621,8 +674,11 @@ function sourceLabel(q) {
  * @param {object} brand    the resolved kit (brand_kit.js load())
  * @param {object[]} quotes findQuote() result per action
  * @param {object} notes    readNotes() result
+ * @param {object[]} [flags] checkModel()'s flags: hedged due cells, and the block under the table
  */
-function buildLayout(model, brand, quotes, notes) {
+function buildLayout(model, brand, quotes, notes, flags) {
+  flags = flags || [];
+  const hedged = new Map(flags.filter((f) => f.kind === 'hedge').map((f) => [f.action, f.words]));
   const S = LAYOUT.SIZE;
   const font = visible(brand.type.FONT);
   const face = faceTable(font);
@@ -644,7 +700,8 @@ function buildLayout(model, brand, quotes, notes) {
   const head = LAYOUT.COLS.map((c) => [para([{ t: c.label, b: true, sz: S.LABEL }])]);
   const rows = model.actions.map((a, i) => {
     const q = quotes[i];
-    const due = String(a.due || '').trim();
+    // A hedged date left unanswered prints the notes' own words, marked.
+    const due = hedged.has(i + 1) ? visible(hedged.get(i + 1)) + ' ' + HEDGE_MARK : String(a.due || '').trim();
     return [
       [para([{ t: String(i + 1), sz: S.BODY }])],
       [para([{ t: a.unowned === true ? UNOWNED_CELL : String(a.owner || '').trim() + (a.ownerAssigned ? ' *' : ''), sz: S.BODY }])],
@@ -663,7 +720,12 @@ function buildLayout(model, brand, quotes, notes) {
     sz: S.SMALL, role: 'muted',
   }], { before: LAYOUT.FOOT.BEFORE, after: LAYOUT.FOOT.AFTER });
 
-  return { face: face.NAME, font, logo, band: { cols: bandCols, cells: bandCells }, meta, head, rows, foot };
+  // Under the footer, and outside the page bound: the block may run to a second page.
+  const F = LAYOUT.FLAGS;
+  const flagParas = flags.length ? [para([{ t: FLAGS_HEAD, b: true, sz: S.SMALL }], { before: F.HEAD_BEFORE, after: 0 })]
+    .concat(flags.map((f) => para([{ t: visible(f.text), sz: S.SMALL }], { before: F.ITEM_BEFORE, after: 0 }))) : [];
+
+  return { face: face.NAME, font, logo, band: { cols: bandCols, cells: bandCells }, meta, head, rows, foot, flags: flagParas };
 }
 
 /** The band or the action cell that is tallest, named for the field it holds. */
@@ -689,7 +751,9 @@ function estimate(layout) {
   const rowHs = layout.rows.map((cells) => rowH(cells, C.PAD_V));
   const footH = stackHeight([layout.foot], LAYOUT.CONTENT_W, face);
   const total = bandH + metaH + headH + rowHs.reduce((a, b) => a + b, 0) + footH;
-  return { total, budget: LAYOUT.BUDGET, bandH, metaH, headH, rowHs, footH, face: layout.face };
+  // Reported, never bounded: the flags may run to a second page; the table may not.
+  const flagsH = stackHeight(layout.flags || [], LAYOUT.CONTENT_W, face);
+  return { total, budget: LAYOUT.BUDGET, bandH, metaH, headH, rowHs, footH, flagsH, face: layout.face };
 }
 
 // ---------------------------------------------------------------------------
@@ -900,7 +964,9 @@ function checkModel(file) {
     if (!String(a.action || '').trim()) V(res, 'action.missing', 'action ' + n + where + ': the action text is empty', tag);
 
     const due = String(a.due || '').trim();
-    if (due && q && !fold(q.span).text.includes(fold(due).text)) {
+    // "dueFirm": true is the user's answer that the date is firm, the date
+    // they gave included.
+    if (due && q && a.dueFirm !== true && !fold(q.span).text.includes(fold(due).text)) {
       WARN(res, 'due.unquoted', 'action ' + n + where + ': due "' + due + '" is not in the quoted source; confirm the notes state it', tag);
     }
     if (q) {
@@ -909,6 +975,46 @@ function checkModel(file) {
       else seen.set(key, n);
     }
   });
+
+  // --- the asking rules: a commitment no action lists, a date the notes hedge --
+  // Warnings, never violations (ruled 2026-11-16). Each asks the user; one left
+  // unanswered builds, and prints as a flag under the table.
+  const flags = [];
+  const covered = new Set();
+  quotes.forEach((q) => { if (q) for (let l = q.lineFrom; l <= q.lineTo; l++) covered.add(l); });
+  const notActions = Array.isArray(model.notActions) ? model.notActions : [];
+  notActions.forEach((s, i) => {
+    const span = String(s || '').trim();
+    const long = fold(span).text.split(' ').filter((w) => /[\p{L}\p{N}]/u.test(w)).length >= 3;
+    const q = long ? findQuote(notes.text, folded, span) : null;
+    if (!q) {
+      V(res, 'notActions.notfound', 'notActions ' + (i + 1) + ': "' + span.slice(0, 120) + '" is not in ' + notes.name +
+        ', at three words or more. It records the user\'s answer that a line is not an action: copy that line from the notes exactly.');
+    } else for (let l = q.lineFrom; l <= q.lineTo; l++) covered.add(l);
+  });
+  const unit = notes.unit[0].toUpperCase() + notes.unit.slice(1);
+  notes.text.split(/\r\n|\r|\n/).forEach((t, i) => {
+    if (covered.has(i + 1) || !COMMITMENT.some((re) => re.test(t))) return;
+    const line = visible(t).replace(/\s+/g, ' ').trim();
+    WARN(res, 'coverage.unlisted', notes.unit + ' ' + (i + 1) + ' reads like a commitment and no action quotes it: "' + line.slice(0, 160) + '". ' +
+      'Ask the user whether it is an action, quoting the line. If it is, list it (owner "" when the notes name nobody). If it is not, ' +
+      'copy the line into "notActions". With no answer, the list builds and the line prints under the table as a flag.', { line: i + 1 });
+    flags.push({ kind: 'coverage', line: i + 1, text: unit + ' ' + (i + 1) + ' may be a commitment this list leaves out: "' + line + '"' });
+  });
+  (actions || []).forEach((a, i) => {
+    const q = quotes[i], due = String((a && a.due) || '').trim();
+    if (!a || !q || !due || a.dueFirm === true || HEDGE.test(due)) return;
+    const h = hedgedDue(notes.text, q, due);
+    if (!h) return;
+    WARN(res, 'due.hedged', 'action ' + (i + 1) + ' (notes ' + notes.unit + ' ' + q.lineFrom + '): due "' + due + '", but the notes hedge it ("' + h.hedge + '"): "' + h.words + '". ' +
+      'Ask the user whether the date is firm, quoting the line. If it is, or they give a firm date, set due to that date and "dueFirm": true. ' +
+      'With no answer, the due cell prints the notes\' words marked ' + HEDGE_MARK + ', and the flag prints under the table.', { action: i + 1, line: q.lineFrom });
+    flags.push({ kind: 'hedge', action: i + 1, line: q.lineFrom, words: h.words,
+      text: HEDGE_MARK + ' Action ' + (i + 1) + ': the notes say "' + h.words + '" (' + notes.unit + ' ' + q.lineFrom + '); the date was not confirmed as firm.' });
+  });
+  // Flags in the order they sit on the page: the table's marks first, then the lines it leaves out.
+  flags.sort((x, y) => (x.kind === y.kind ? 0 : x.kind === 'hedge' ? -1 : 1));
+  res.flags = flags;
 
   // --- hard-fail 4: the kit the build will read passes brand_check.js --------
   let badBand = false;
@@ -945,7 +1051,7 @@ function checkModel(file) {
 
   // --- hard-fail 3: one page ----------------------------------------------
   if (brand && !badBand && model.actions.length) {
-    const layout = buildLayout(model, brand, quotes, notes);
+    const layout = buildLayout(model, brand, quotes, notes, flags);
     const est = estimate(layout);
     res.estimate = est;
     res.layout = layout;
@@ -1192,10 +1298,24 @@ function checkDocxBuffer(buf, name, opts) {
   const outside = xml.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, '<w:tbl/>');
   const bodyStart = outside.indexOf('<w:body>');
   const topParas = parasOf(outside.slice(bodyStart));
-  // The band, then the meta line, then the actions table, then the footer.
+  // The band, then the meta line, then the actions table, then the footer,
+  // then the flags block if there is one. The block is outside the bound.
   layout.meta = topParas[0] || { runs: [], pitch: 0 };
-  layout.foot = topParas[topParas.length - 1] || { runs: [], pitch: 0 };
-  if (topParas.length !== 2) V(res, 'layout.paragraphs', 'expected 2 paragraphs outside the tables (the count line and the footer), found ' + topParas.length);
+  layout.foot = topParas[1] || { runs: [], pitch: 0 };
+  const flagParas = topParas.slice(2);
+  layout.flags = flagParas;
+  const hasFlags = flagParas.length > 1 && (flagParas[0].text || '').trim() === FLAGS_HEAD;
+  if (topParas.length < 2 || (flagParas.length && !hasFlags)) {
+    V(res, 'layout.paragraphs', 'expected the count line and the footer outside the tables, then only a flags block headed "' + FLAGS_HEAD +
+      '" with at least one flag; found ' + topParas.length + ' paragraph(s)');
+  }
+  // A marked due cell stands only with the block that says what the mark means.
+  if (!hasFlags) {
+    rows.slice(1).forEach((cells, i) => {
+      const due = (cells[3] || []).map((p) => p.text || '').join(' ').trim();
+      if (due.endsWith(HEDGE_MARK)) V(res, 'flags.missing', 'row ' + (i + 1) + ': the due cell is marked ' + HEDGE_MARK + ' and the page carries no flags block saying the date was not confirmed', { action: i + 1 });
+    });
+  }
 
   // --- the builder's formatting (FORMAT, above), and its values -----------------
   const fonts = new Set();
@@ -1225,10 +1345,11 @@ function checkDocxBuffer(buf, name, opts) {
     }
   };
   for (const tbl of [bandX, actX]) for (const p of parasOf(tbl)) spacingIs(tbl === bandX ? 'the band' : 'the actions table', p, 0, 0);
-  if (topParas.length === 2) {
+  if (topParas.length >= 2) {
     spacingIs('the count line', topParas[0], LAYOUT.COUNT_LINE.BEFORE, LAYOUT.COUNT_LINE.AFTER);
     spacingIs('the footer', topParas[1], LAYOUT.FOOT.BEFORE, LAYOUT.FOOT.AFTER);
   }
+  if (hasFlags) flagParas.forEach((p, k) => spacingIs(k ? 'flag ' + k : 'the flags heading', p, k ? LAYOUT.FLAGS.ITEM_BEFORE : LAYOUT.FLAGS.HEAD_BEFORE, 0));
   if (fmt.length) {
     fmt.splice(0, fmt.length, ...new Set(fmt)); // one line per difference, not per cell
     V(res, 'layout.format', fmt.length + ' formatting difference' + (fmt.length === 1 ? '' : 's') + ' from the builder\'s: ' +
@@ -1259,6 +1380,8 @@ function checkDocx(file) {
 // ---------------------------------------------------------------------------
 
 function report(res) {
+  // An id as long as the column still gets a space before its message.
+  const pad = (id) => (id.length >= 17 ? id + ' ' : id.padEnd(17));
   const out = [];
   out.push('action_check — ' + res.file + (res.mode === 'docx' ? ' (built document)' : ' (before build)'));
   if (res.fatal) {
@@ -1274,16 +1397,17 @@ function report(res) {
     const e = res.estimate;
     out.push('  page: ' + e.total + ' of ' + e.budget + ' twips (' + Math.round((100 * e.total) / e.budget) + '%), ' +
       (e.rowHs.length) + ' action row' + (e.rowHs.length === 1 ? '' : 's') + ', ' + e.face + ' width table');
+    if (e.flagsH) out.push('  flags: printed under the table, ' + e.flagsH + ' twips, outside the one-page bound');
   }
   out.push('');
-  for (const v of res.violations) out.push('  FAIL  ' + v.id.padEnd(17) + v.msg);
-  for (const w of res.warnings) out.push('  WARN  ' + w.id.padEnd(17) + w.msg);
+  for (const v of res.violations) out.push('  FAIL  ' + pad(v.id) + v.msg);
+  for (const w of res.warnings) out.push('  WARN  ' + pad(w.id) + w.msg);
   for (const n of res.notes) out.push('  NOTE  ' + n);
   if (res.violations.length || res.warnings.length || res.notes.length) out.push('');
   out.push(res.violations.length
     ? 'FAIL — ' + res.violations.length + ' violation' + (res.violations.length === 1 ? '' : 's') +
       (res.mode === 'docx' ? ' in the built document.' : '. No document is written.')
-    : 'PASS — ' + (res.mode === 'docx' ? 'the document is one page by the bound, and every row has an owner and a source.' : 'safe to build.'));
+    : 'PASS — ' + (res.mode === 'docx' ? 'the table is one page by the bound, and every row has an owner and a source.' : 'safe to build.'));
   return out.join('\n');
 }
 

@@ -5,9 +5,9 @@ the page, the brand kit. It never sees the request, so the rules below, quoted
 from SKILL.md, are ones no tool can check: which requests the skill refuses or
 hands on, what in the notes counts as an action, and whether the steps ran in
 order. They are listed here so a passing check is never read as covering them:
-for these, read the reply itself against SKILL.md. One section is not a
-SKILL.md rule: "A built list edited by hand" names what `action_check.js`
-itself does not measure.
+for these, read the reply itself against SKILL.md. Two sections are not
+SKILL.md rules: "What the two asking rules miss" and "A built list edited by
+hand" name what `action_check.js` itself does not measure.
 
 ## Requests the skill refuses or hands on
 
@@ -20,6 +20,29 @@ itself does not measure.
 ## What counts as an action
 
 - **Notes with no commitments in them**: "Do not turn discussion points, or a topic the meeting agreed to come back to, into actions to fill the table."
+
+## What the two asking rules miss
+
+`coverage.unlisted` and `due.hedged` match word lists, so a passing check with
+neither warning does not mean nothing was dropped or hedged:
+
+- **A commitment worded off the list** ("Ana's on the labels", "labels: Ana")
+  is not seen, and the check cannot tell whether it was left out.
+- **Coverage is by line.** A line holding two commitments counts as listed
+  once any action quotes it, so the second can still be dropped.
+- **A hedge worded off the list** ("we'll see about the 14th") is not seen.
+  A hedge on a date the due value never names, in a sentence of its own, is
+  not seen either: the check reads the sentence that holds the due date.
+- **A line worded like a commitment that is not one** ("the co-packer will
+  be closed in December") is flagged anyway. The answer is `notActions`.
+- **The built .docx** carries no notes, so its check does not recompute
+  either rule. It requires that a marked due cell stand with the flags block.
+
+## Whether the user was asked
+
+- **"ask the user about each, in one message, quoting the lines"**: no tool
+  sees whether the question was put before the build. A flag on the page
+  means it was not answered; it does not show whether it was asked.
 
 ## A built list edited by hand
 
