@@ -108,6 +108,22 @@ It lists commitments and stops. It does not write minutes, a summary, or the
 next meeting's agenda, and it does not convert its output to PDF. Asked for
 any of those, it says so instead of producing something nobody checked.
 
+## Reading a security scan of this repository
+
+Two kinds of finding show up when a directory scans this repository. Both are
+on purpose.
+
+- **Strings built from character codes** (`action_check.js`). A meeting-notes
+  `.docx` can store a character as a numeric reference, `&#32;` or `&#x20;`, and
+  the checker turns each one back into the character so a quote can match the
+  notes. `String.fromCodePoint` is how JavaScript does that. Without it, real
+  quotes from those notes are refused. Nothing it decodes is run.
+- **Environment variable reads** (`HPW_BRAND_KIT`). The variable says where the
+  brand kit is, and `--kit` sets it for the scripts that load the kit. No other
+  variable is read.
+
+The skill starts no process and opens no network connection.
+
 ## License
 
 MIT. `LICENSE.txt` states two sets of terms because it ships unchanged in every
