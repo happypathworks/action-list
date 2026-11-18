@@ -1,6 +1,6 @@
 {
   "name": "action-list",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "Turns meeting notes into a one-page action list as a Word document: owner, action, due date, and the line in the notes each action came from.",
   "author": {
     "name": "Happy Path Works",
